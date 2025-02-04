@@ -13,8 +13,8 @@ exports.sendFeedback = async (req, res) => {
       });
     }
 
-    // Create feedback
-    const feedback = await Feedback.create({
+    // Create feedback object
+    const feedback = new Feedback({
       name,
       email,
       company,
@@ -22,23 +22,34 @@ exports.sendFeedback = async (req, res) => {
       message
     });
 
-    // Send email notification
-    const emailSent = await sendFeedbackEmail(feedback);
-    console.log('Email sending status:', emailSent);
-
+    // Send response immediately after validation
     res.status(201).json({
       success: true,
       message: 'Feedback submitted successfully',
-      emailSent,
       feedback
     });
+
+    // Handle database save and email sending after response
+    try {
+      // Save to database
+      await feedback.save();
+      console.log('Feedback saved to database');
+
+      // Send email
+      const emailSent = await sendFeedbackEmail(feedback);
+      console.log('Email sending status:', emailSent);
+    } catch (error) {
+      console.error('Background operation error:', error);
+    }
   } catch (error) {
     console.error('Feedback submission error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error submitting feedback',
-      error: error.message
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Error submitting feedback',
+        error: error.message
+      });
+    }
   }
 };
 
