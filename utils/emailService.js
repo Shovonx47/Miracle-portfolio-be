@@ -1,23 +1,19 @@
 const nodemailer = require('nodemailer');
 
-// Create reusable transporter
-let transporter = null;
-
 const createTransporter = () => {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      },
-      pool: true, // use pooled connections
-      maxConnections: 3, // limit concurrent connections
-      maxMessages: Infinity,
-      rateDelta: 1000, // wait 1 second between messages
-      rateLimit: 3 // limit to 3 messages per rateDelta
-    });
-  }
+  // Create transporter with simple configuration
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    },
+    debug: true, // Enable debug logging
+    logger: true  // Log to console
+  });
+
   return transporter;
 };
 
@@ -55,29 +51,50 @@ const getEmailContent = (feedback) => `
 `;
 
 const sendFeedbackEmail = async (feedback) => {
+  console.log('Starting email send process...');
+  console.log('Email configuration:', {
+    user: process.env.EMAIL_USER ? 'Set' : 'Not set',
+    pass: process.env.EMAIL_PASS ? 'Set' : 'Not set'
+  });
+
   try {
-    // Get or create transporter
     const transport = createTransporter();
+    
+    // Test connection first
+    await transport.verify();
+    console.log('SMTP connection verified successfully');
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: ['shovonislam493@gmail.com', feedback.email],
+      from: {
+        name: 'Miracle Portfolio',
+        address: process.env.EMAIL_USER
+      },
+      to: 'shovonislam493@gmail.com', // Send only to your email for now
       subject: `New Feedback: ${feedback.subject}`,
       html: getEmailContent(feedback)
     };
 
-    // Set a timeout for the email sending operation
-    const emailPromise = transport.sendMail(mailOptions);
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Email timeout')), 8000)
-    );
+    console.log('Attempting to send email with options:', {
+      to: mailOptions.to,
+      from: mailOptions.from,
+      subject: mailOptions.subject
+    });
 
-    // Race between email sending and timeout
-    const info = await Promise.race([emailPromise, timeoutPromise]);
-    console.log('Email sent:', info.messageId);
+    const info = await transport.sendMail(mailOptions);
+    console.log('Email sent successfully');
+    console.log('Message ID:', info.messageId);
+    console.log('Response:', info.response);
     return true;
   } catch (error) {
-    console.error('Email sending failed:', error);
+    console.error('Detailed email error:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      stack: error.stack
+    });
     return false;
   }
 };
