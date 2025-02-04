@@ -5,10 +5,24 @@ const nodemailer = require('nodemailer');
 let transporter;
 try {
   transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // true for 465, false for other ports
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      pass: process.env.EMAIL_PASS // This should be an App Password
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+
+  // Verify connection configuration
+  transporter.verify(function (error, success) {
+    if (error) {
+      console.error('SMTP connection error:', error);
+    } else {
+      console.log('SMTP Server is ready to take our messages');
     }
   });
 } catch (error) {
@@ -49,8 +63,8 @@ exports.sendFeedback = async (req, res) => {
       if (transporter) {
         // Configure email
         const mailOptions = {
-          from: process.env.EMAIL_USER,
-          to: 'shovonislam493@gmail.com',
+          from: `"Miracle Portfolio" <${process.env.EMAIL_USER}>`,
+          to: ['shovonislam493@gmail.com', email], // Send to both admin and user
           subject: `New Feedback: ${subject}`,
           html: `
             <h2>New Feedback Received</h2>
@@ -63,10 +77,20 @@ exports.sendFeedback = async (req, res) => {
           `
         };
 
-        // Send email without waiting
-        transporter.sendMail(mailOptions)
-          .then(() => console.log('Email sent successfully'))
-          .catch(error => console.error('Error sending email:', error));
+        // Send email and wait for result
+        try {
+          const info = await transporter.sendMail(mailOptions);
+          console.log('Email sent successfully:', info.messageId);
+          console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+        } catch (emailError) {
+          console.error('Error sending email:', emailError);
+          // Log specific error details
+          if (emailError.response) {
+            console.error('SMTP Response:', emailError.response);
+          }
+        }
+      } else {
+        console.error('Transporter not initialized');
       }
     } catch (error) {
       console.error('Error in background operations:', error);
